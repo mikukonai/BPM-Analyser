@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <title>Otonashi</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        .Main {
+            width: 60%;
+            max-width: 800px;
+            margin: 50px auto;
+        }
+        a {
+            color: inherit;
+            text-decoration: none;
+            border-bottom: 1px dotted #666;
+        }
+        a:hover{
+            color: #0066dd;
+            text-decoration:none;
+            border-bottom: 1px solid #0066dd;
+        }
+        p {
+            margin: 5px 0;
+        }
+        .output {
+            font-family: 'consolas', Courier, monospace;
+            font-size: 14px;
+            line-height: 24px;
+        }
+        table {
+            border-collapse: collapse;
+            margin: 10px 0;
+        }
+        td {
+            text-align: center;
+            min-width: 3em;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            height:30px; line-height: 30px; font-size: 14px; border: none; border-radius: 5px;
+            color: #00aaff; border: 1px solid #e1f5ff; background-color: #e1f5ff; padding: 0 10px; }
+        button:hover { color: #00aaff; background-color: #cdeeff; border: 1px solid #cdeeff; }
+        button:active { color: #ffffff; background-color: #40bfff; border: 1px solid #40bfff; }
+        button:disabled { color: #888888; background-color: #eeeeee; border: 1px solid #eeeeee; }
+    </style>
+</head>
+<body>
+<div class="Main">
+    <div style="font-size: 18px; margin: 20px 0; color: #222; font-weight: bold;">
+        🎵 BPM Analyser
+    </div>
+
+    <div style="text-align: left; font-size: 14px; margin: 10px 0; padding: 5px 10px; border-radius: 5px; background: #f0f0f0;">
+        <p><span style="font-size: 13px; color: #aaa;">音频数据仅在浏览器内部处理，可查看本页代码以了解实现详情。</span></p>
+        <p></p><b>打开音频文件：</b><input type="file" id="fileSelector" name="files[]" multiple=""></p>
+    </div>
+
+    <div id="output" class="output"></div>
+
+    <div style="margin: 10px 0;">
+        <button id="play" data-state="stopped"><span id="playLabel">开始分析并播放</span></button>
+        <button id="refresh" onclick="window.location.reload();">刷新</button>
+    </div>
+
+    <div style="text-align: center; font-size: 13px; color:#888888; margin: 20px auto; line-height: 20px;">
+        <div><a href="https://github.com/mikukonai/BPM-Analyser">GitHub</a></div>
+    </div>
+</div>
+
+<script src="./script/jquery.min.js"></script>
+<script src="./script/fft.js"></script>
+<script src="./script/bpm.js"></script>
+
+<script>
+
+let PCM;
+let AudioContext = new window.AudioContext();
+
+let rawAudioData;
+
+let fileSelector = document.getElementById('fileSelector');
+fileSelector.onchange = () => {
+    let file = fileSelector.files[0];
+    let Reader = new FileReader();
+    Reader.onloadend = () => {
+        rawAudioData = Reader.result;
+    }
+    Reader.readAsArrayBuffer(file);
+};
+
+function Render(rawAudioData) {
+    AudioContext.decodeAudioData(rawAudioData, (audioBuffer) => {
+        // 获取两个声道的原始数据
+        let SampleRate = audioBuffer.sampleRate;
+        let leftChannel  = audioBuffer.getChannelData(0);
+        let rightChannel = audioBuffer.getChannelData(1);
+
+        let AudioBufferSourceNode = AudioContext.createBufferSource();
+        AudioBufferSourceNode.connect(AudioContext.destination);
+        AudioBufferSourceNode.buffer = audioBuffer;
+        AudioBufferSourceNode.start(0);
+
+        BPM(leftChannel, SampleRate,
+            (msg) => {
+                let html = $("#output").html();
+                $("#output").html(html + msg + `<br>`);
+            },
+            (res) => {
+                let html = $("#output").html();
+
+                let line1 = ``, line2 = ``;
+                for(let bpm in res.TempoDistribution) {
+                    line1 += `<td>${bpm}</td>`;
+                    line2 += `<td>${res.TempoDistribution[bpm]}</td>`;
+                }
+                let table1 = `<table><tr>${line1}</tr><tr>${line2}</tr></table>`
+
+                line1 = `<td><b>位置</b></td>`, line2 = `<td><b>BPM</b></td>`;
+                for(let position in res.TempoSpectrum) {
+                    line1 += `<td>${position}</td>`;
+                    line2 += `<td>${res.TempoSpectrum[position]}</td>`;
+                }
+                let table2 = `<table><tr>${line1}</tr><tr>${line2}</tr></table>`
+
+
+                $("#output").html(`
+                ${html}
+                <p><b>BPM分布</b></p>
+                ${table1}
+                <p><b>各时间段BPM</b></p>
+                ${table2}
+                <b>BPM = ${res.BPM}</b>
+                <br>`);
+            }
+        );
+    });
+}
+
+
+$("#play").click(() => {
+    let state = $("#play").attr("data-state");
+    if(state === "stopped") {
+        $("#playLabel").html("暂停");
+        Render(rawAudioData);
+        $("#play").attr("data-state", "playing");
+    }
+    else if(state === "playing") {
+        AudioContext.suspend();
+        $("#playLabel").html("继续播放");
+        $("#play").attr("data-state", "pausing");
+    }
+    else if(state === "pausing") {
+        AudioContext.resume();
+        $("#playLabel").html("暂停");
+        $("#play").attr("data-state", "playing");
+    }
+});
+
+</script>
+
+
+</body>
+</html>
