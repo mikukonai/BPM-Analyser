@@ -97,12 +97,19 @@ function GetEnergySeries(PCM, frameOffset, frameNumber, frameLength) {
         return clist;
     };
     function calculateEnergy(arr) {
+        let sum = 0;
+        for(let i = 0; i < arr.length; i++) {
+            sum += (arr[i] * arr[i]);
+        }
+        return sum;
+        /*
         let spect = FFT(ToComplexList(arr), frameLength);
         let sum = 0;
         for(let i = 0; i < spect.length; i++) {
             sum += (spect[i].absSqr() <= 0) ? 0 : (Math.pow(Math.log10(spect[i].absSqr()), 2));
         }
         return sum;
+        */
     }
     let maxFrameNumber = (PCM.length / frameLength) >> 0;
     if(frameOffset >= maxFrameNumber || frameOffset + frameNumber > maxFrameNumber) {
